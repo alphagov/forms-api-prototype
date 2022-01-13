@@ -1,0 +1,5 @@
+---
+applications:
+- name: cifu-xgov-persistence-service
+  memory: 256M
+  command: ruby server.rb
