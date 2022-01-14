@@ -7,22 +7,32 @@ before do
 end
 
 post "/publish" do
+  user = request.env['HTTP_X_API_KEY']
   request_body = request.body.read
   request = JSON.parse(request_body)
 
   id = request['id']
   config = {}
   config = request['configuration'] if request['configuration']
-  p config
+  filename = id
+  filename = "#{id}_#{user}" if user
 
-  File.write("./forms/#{id}", JSON.dump(config))
+  File.write("./forms/#{filename}", JSON.dump(config))
 
   config.to_json
 end
 
 get "/published" do
+  user = request.env['HTTP_X_API_KEY']
+
   files = []
-  forms = Dir.entries("./forms").select { |filename| File.file?("./forms/#{filename}") }
+  forms = []
+
+  if user
+    forms = Dir.entries("./forms").select { |filename| File.file?("./forms/#{filename}") && filename.include?(user) }
+  else
+    forms = Dir.entries("./forms").select { |filename| File.file?("./forms/#{filename}") }
+  end
   forms.each do |form|
     File.open("./forms/#{form}") do |f|
       files << {
@@ -37,15 +47,18 @@ get "/published" do
 end
 
 get "/published/:id" do
+  user = request.env['HTTP_X_API_KEY']
   form_content = {}
+  filename = params['id']
+  filename = "#{params['id']}_#{user}" if user
 
-  File.open("./forms/#{params['id']}") do |f|
+  File.open("./forms/#{filename}") do |f|
     file_content = f.read
     form_content = JSON.parse(file_content)
   end
 
   {
-    id: params['id'],
+    id: filename,
     values: form_content
   }.to_json
 end
