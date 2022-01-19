@@ -23,14 +23,27 @@ class Server < Sinatra::Base
     config = {}
     config = request['configuration'] if request['configuration']
 
-    @database[:forms].insert(
-      username: user,
-      key: id,
-      display_name: id,
-      form: Sequel.pg_json(config)
-    )
+    if form_exists_for_user?(user, id)
+      @database[:forms].where(
+        username: user,
+        key: id
+      ).update(
+        form: Sequel.pg_json(config)
+      )
+    else
+      @database[:forms].insert(
+        username: user,
+        key: id,
+        display_name: id,
+        form: Sequel.pg_json(config)
+      )
+    end
 
     config.to_json
+  end
+
+  def form_exists_for_user?(user, key)
+    !@database[:forms].where(username: user, key: key).all.empty?
   end
 
   get "/published" do
