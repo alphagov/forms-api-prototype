@@ -3,3 +3,5 @@ applications:
 - name: cifu-xgov-persistence-service
   memory: 256M
   command: bundle exec rackup
+  services:
+    - cifu-xgov-form-api-db
