@@ -2,4 +2,4 @@
 applications:
 - name: cifu-xgov-persistence-service
   memory: 256M
-  command: ruby server.rb
+  command: bundle exec rackup
