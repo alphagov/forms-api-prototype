@@ -65,6 +65,11 @@ class Server < Sinatra::Base
     user = request.env['HTTP_X_API_KEY']
     form = @database[:forms].where(username: user, key: params['id']).first
 
+    if form.nil?
+      response.status = 404
+      return {}.to_json
+    end
+
     {
       id: form[:key],
       values: form[:form]
