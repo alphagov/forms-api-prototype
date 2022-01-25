@@ -62,7 +62,9 @@ class Server < Sinatra::Base
   end
 
   get "/published/:id" do
-    user = request.env['HTTP_X_API_KEY']
+    api_key = request.env['HTTP_X_API_KEY']
+    user = api_key unless api_key.nil? || api_key.empty?
+
     form = @database[:forms].where(username: user, key: params['id']).first
 
     if form.nil?
