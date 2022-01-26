@@ -1,6 +1,7 @@
 require "sinatra"
 require "json"
 require "pry"
+require 'jwt'
 require_relative "./db/database"
 
 class Server < Sinatra::Base
@@ -14,7 +15,7 @@ class Server < Sinatra::Base
   end
 
   post "/publish" do
-    user = request.env['HTTP_X_API_KEY']
+    user = authenticated_user
 
     request_body = request.body.read
     request = JSON.parse(request_body)
@@ -47,7 +48,7 @@ class Server < Sinatra::Base
   end
 
   get "/published" do
-    user = request.env['HTTP_X_API_KEY']
+    user = authenticated_user
     forms = []
 
     forms_for_user(user).each do |form|
@@ -62,7 +63,7 @@ class Server < Sinatra::Base
   end
 
   get "/published/:id" do
-    api_key = request.env['HTTP_X_API_KEY']
+    api_key = authenticated_user
     user = api_key unless api_key.nil? || api_key.empty?
 
     form = @database[:forms].where(username: user, key: params['id']).first
@@ -84,7 +85,32 @@ class Server < Sinatra::Base
     @database[:forms].where(username: params['user']).select(:key).all.to_json
   end
 
+  get "/login" do
+    content_type :html
+
+    erb :login
+  end
+
+  post "/login" do
+    content_type :html
+
+    payload = { user: params['name'] }
+    token = JWT.encode payload, nil, 'none'
+
+    redirect "http://localhost:3000/app/auth?token=#{token}"
+  end
+
   private
+
+  def authenticated_user
+    token = request.env['HTTP_X_API_KEY']
+    begin
+      decoded_token = JWT.decode token, nil, false
+      return decoded_token[0]["user"]
+    rescue
+      return nil
+    end
+  end
 
   def forms_for_user(user)
     forms = @database[:forms].where(username: user).all
