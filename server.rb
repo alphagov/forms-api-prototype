@@ -97,7 +97,7 @@ class Server < Sinatra::Base
     payload = { user: params['name'] }
     token = JWT.encode payload, nil, 'none'
 
-    redirect "http://localhost:3000/app/auth?token=#{token}"
+    redirect "#{ENV['DESIGNER_URL']}/app/auth?token=#{token}"
   end
 
   private
