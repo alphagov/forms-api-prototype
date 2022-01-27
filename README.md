@@ -1,3 +1,3 @@
-# CIFU Forms API Prototype
+# GOV.UK Forms API Prototype
 
-A prototype for a forms API for the collecting information from users team built with Ruby and Sinatra.
+A prototype for a forms API for the GOV.UK Forms team built with Ruby and Sinatra.
