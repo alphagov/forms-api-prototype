@@ -3,6 +3,8 @@ use color_eyre::eyre::Result;
 
 use poem::{listener::TcpListener, Route, Server};
 use poem_openapi::{OpenApiService};
+use poem::EndpointExt;
+//use poem::middleware::Cors;
 use sqlx::postgres::PgPoolOptions;
 
 mod api;
@@ -23,7 +25,7 @@ fn setup() -> Result<(), Report> {
 #[tokio::main]
 async fn main() -> Result<()> {
     setup()?;
-    let _pool = PgPoolOptions::new()
+    let pool = PgPoolOptions::new()
             .max_connections(5)
             .connect("postgres://postgres:password@localhost/postgres").await?;
 
@@ -32,7 +34,7 @@ async fn main() -> Result<()> {
     let ui = api_service.swagger_ui();
 
     Server::new(TcpListener::bind("0.0.0.0:3000"))
-        .run(Route::new().nest("/api", api_service).nest("/", ui))
+        .run(Route::new().nest("/api", api_service).nest("/", ui).data(pool))//.with(Cors))
         .await?;
     Ok(())
 }
