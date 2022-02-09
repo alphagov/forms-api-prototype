@@ -15,12 +15,11 @@ use poem_openapi::{
 /// def form_exists_for_user?(user, key)
 /// get "/published"
 /// get "/published/:id"
-/// get "/seed/:user"
-/// get "/login"
-/// post "/login"
 /// def authenticated_user
 /// def forms_for_user(user)
+///
 /// def seed_data_for_user(user)
+/// get "/seed/:user" (optional, designer expects forms to exist)
 
 pub struct Api;
 
