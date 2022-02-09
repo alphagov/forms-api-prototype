@@ -4,7 +4,7 @@ use color_eyre::eyre::Result;
 use poem::{listener::TcpListener, Route, Server};
 use poem_openapi::{OpenApiService};
 use poem::EndpointExt;
-//use poem::middleware::Cors;
+use poem::middleware::Cors;
 use sqlx::postgres::PgPoolOptions;
 
 mod api;
@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
     let ui = api_service.swagger_ui();
 
     Server::new(TcpListener::bind("0.0.0.0:3000"))
-        .run(Route::new().nest("/api", api_service).nest("/", ui).data(pool))//.with(Cors))
+        .run(Route::new().nest("/api", api_service).nest("/", ui).data(pool).with(Cors::new()))
         .await?;
     Ok(())
 }
