@@ -9,6 +9,10 @@ use poem_openapi::{
     OpenApi,
     Object
 };
+use poem::{
+    web::Data
+};
+use sqlx::postgres::PgPoolOptions;
 
 /// # API design
 /// post "/publish"
@@ -23,12 +27,13 @@ use poem_openapi::{
 
 pub struct Api;
 
+
 #[OpenApi]
 impl Api {
 
     #[oai(path = "/publish", method = "post")]
     async fn create_user(&self, request: Json<Request>) -> Json<String> {
-        if form_exists_for_user("test user".to_string(), "test key".to_string()) {
+        if form_exists_for_user("test user".to_string(), "test  key".to_string()) {
             //update forms where user and id with config=request.configuration
         } else {
             //update forms where user and id with config=request.configuration and display_name=id
@@ -37,9 +42,24 @@ impl Api {
     }
 
     #[oai(path = "/published/:id", method = "get")]
-    async fn published(&self, id:Path<i64>) -> PlainText<String> {
+    async fn published(&self, pool: Data<&PgPoolOptions>, id:Path<i64>) -> PlainText<String> {
+
+    let countries = sqlx::query_as!(Country,
+            "
+            SELECT country, COUNT(*) as count
+            FROM users
+            GROUP BY country
+            WHERE organization = ?
+            ",
+            "test"
+        )
+        .fetch_all(&pool) // -> Vec<Country>
+        .await;
+
         PlainText(format!("Form id: {}!", id.0))
     }
+
+
 }
 
 #[derive(Object)]
@@ -48,6 +68,7 @@ struct Request {
     configuration: String,
 }
 
+struct Country { country: String, count: i64 }
 
 fn form_exists_for_user(_user: String, _key: String) -> bool {
     true

@@ -1,15 +1,18 @@
+extern crate dotenv;
+
 use color_eyre::Report;
 use color_eyre::eyre::Result;
-
 use poem::{listener::TcpListener, Route, Server};
 use poem_openapi::{OpenApiService};
 use poem::EndpointExt;
 use poem::middleware::Cors;
 use sqlx::postgres::PgPoolOptions;
+use dotenv::dotenv;
 
 mod api;
 
 fn setup() -> Result<(), Report> {
+    dotenv().ok();
     if std::env::var("RUST_LIB_BACKTRACE").is_err() {
         std::env::set_var("RUST_LIB_BACKTRACE", "0")
     }
@@ -34,7 +37,11 @@ async fn main() -> Result<()> {
     let ui = api_service.swagger_ui();
 
     Server::new(TcpListener::bind("0.0.0.0:3000"))
-        .run(Route::new().nest("/api", api_service).nest("/", ui).data(pool).with(Cors::new()))
+        .run(Route::new()
+        .nest("/api", api_service)
+        .nest("/", ui)
+        .data(pool)
+        .with(Cors::new()))
         .await?;
     Ok(())
 }
