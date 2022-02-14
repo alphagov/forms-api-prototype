@@ -1,18 +1,11 @@
+use poem::web::Data;
 use poem_openapi::{
-    param::{
-        Path
-    },
-    payload::{
-        Json,
-        PlainText
-    },
-    OpenApi,
-    Object
+    param::Path,
+    payload::{Json, PlainText},
+    Object, OpenApi,
 };
-use poem::{
-    web::Data
-};
-use sqlx::postgres::PgPoolOptions;
+use serde_json::Value;
+use sqlx::postgres::PgPool;
 
 /// # API design
 /// post "/publish"
@@ -27,10 +20,8 @@ use sqlx::postgres::PgPoolOptions;
 
 pub struct Api;
 
-
 #[OpenApi]
 impl Api {
-
     #[oai(path = "/publish", method = "post")]
     async fn create_user(&self, request: Json<Request>) -> Json<String> {
         if form_exists_for_user("test user".to_string(), "test  key".to_string()) {
@@ -42,24 +33,20 @@ impl Api {
     }
 
     #[oai(path = "/published/:id", method = "get")]
-    async fn published(&self, pool: Data<&PgPoolOptions>, id:Path<i64>) -> PlainText<String> {
+    async fn published(&self, pool: Data<&PgPool>, id: Path<i64>) -> PlainText<String> {
+        let forms = sqlx::query_as!(Forms, "SELECT * FROM forms")
+            .fetch_all(pool.0)
+            .await
+            .unwrap();
 
-    let countries = sqlx::query_as!(Country,
-            "
-            SELECT country, COUNT(*) as count
-            FROM users
-            GROUP BY country
-            WHERE organization = ?
-            ",
-            "test"
-        )
-        .fetch_all(&pool) // -> Vec<Country>
-        .await;
-
-        PlainText(format!("Form id: {}!", id.0))
+        let username = forms
+            .first()
+            .expect("No forms in DB")
+            .username
+            .as_ref()
+            .unwrap();
+        PlainText(format!("Form id: {}!", username))
     }
-
-
 }
 
 #[derive(Object)]
@@ -68,7 +55,14 @@ struct Request {
     configuration: String,
 }
 
-struct Country { country: String, count: i64 }
+#[derive(Debug, sqlx::Type)]
+struct Forms {
+    id: i64,
+    username: Option<String>,
+    key: Option<String>,
+    display_name: Option<String>,
+    form: Option<Value>,
+}
 
 fn form_exists_for_user(_user: String, _key: String) -> bool {
     true
