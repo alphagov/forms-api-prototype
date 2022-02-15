@@ -4,8 +4,11 @@ use poem_openapi::{
     payload::{Json, PlainText},
     Object, OpenApi,
 };
-use serde_json::Value;
-use sqlx::postgres::PgPool;
+use serde_json::{
+    Value,
+    json
+};
+use sqlx::{postgres::PgPool, Error};
 
 /// # API design
 /// post "/publish"
@@ -33,9 +36,9 @@ impl Api {
     }
 
     #[oai(path = "/published/:id", method = "get")]
-    async fn published(&self, pool: Data<&PgPool>, id: Path<i64>) -> PlainText<String> {
-        let forms = sqlx::query_as!(Forms, "SELECT * FROM forms")
-            .fetch_all(pool.0)
+    async fn published(&self, data_pool: Data<&PgPool>, id: Path<i64>) -> PlainText<String> {
+        let forms: Vec<Form> = sqlx::query_as!(Form, "SELECT * FROM forms")
+            .fetch_all(data_pool.0)
             .await
             .unwrap();
 
@@ -47,6 +50,45 @@ impl Api {
             .unwrap();
         PlainText(format!("Form id: {}!", username))
     }
+
+    #[oai(path = "/seed/:user", method = "get")]
+    async fn seed(&self, data_pool: Data<&PgPool>, user: Path<String>) -> PlainText<String> {
+        // For each json file in /example_forms, add to db, for current user
+        // insert into airport values (‘San Francisco’,’SFO’,ARRAY[23.42,-34.42, 23.34]);
+
+        new_form(
+            data_pool.0,
+            1, //TODO: Use the filename for the ID
+            "test user",
+            "key",
+            "display_name",
+            json!({"one": "two"})
+        ).await
+        .expect("Form not inserted into db");
+
+
+        PlainText(format!("forms created for user: {}", user.0))
+    }
+}
+
+async fn new_form(
+    pool: &PgPool,
+    id: i64,
+    username: &str,
+    key: &str,
+    display_name: &str,
+    form: Value,
+) -> Result<sqlx::postgres::PgRow, Error> {
+        sqlx::query_as!(
+            Form, 
+            "INSERT INTO forms VALUES ($1, $2, $3, $4, $5);",
+            id,
+            username,
+            key,
+            display_name,
+            form)
+            .fetch_one(pool)
+            .await
 }
 
 #[derive(Object)]
@@ -56,7 +98,7 @@ struct Request {
 }
 
 #[derive(Debug, sqlx::Type)]
-struct Forms {
+struct Form {
     id: i64,
     username: Option<String>,
     key: Option<String>,
