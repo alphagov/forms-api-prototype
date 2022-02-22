@@ -1434,9 +1434,11 @@ dependencies = [
  "dotenv",
  "poem",
  "poem-openapi",
+ "rand",
  "serde_json",
  "sqlx",
  "tokio",
+ "tracing",
  "tracing-subscriber 0.2.25",
 ]
 
