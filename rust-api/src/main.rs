@@ -8,13 +8,16 @@ use poem::EndpointExt;
 use poem::{listener::TcpListener, Route, Server};
 use poem_openapi::OpenApiService;
 use sqlx::postgres::PgPool;
+use tracing_subscriber::EnvFilter;
 
 mod api;
 
 fn setup() -> Result<(), Report> {
     dotenv().ok();
     color_eyre::install()?;
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
 
     Ok(())
 }
@@ -22,6 +25,7 @@ fn setup() -> Result<(), Report> {
 #[tokio::main]
 async fn main() -> Result<()> {
     setup()?;
+
     let pool = PgPool::connect("postgres://postgres:password@localhost/postgres").await?;
 
     let api_service = OpenApiService::new(api::Api, "Forms API Rust Prototype", "0.0.1-alpha")
