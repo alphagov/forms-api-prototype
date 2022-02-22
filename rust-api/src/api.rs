@@ -11,15 +11,15 @@ use serde_json::{
 use sqlx::{postgres::PgPool, Error};
 
 /// # API design
-/// post "/publish"
-/// def form_exists_for_user?(user, key)
-/// get "/published"
-/// get "/published/:id"
-/// def authenticated_user
-/// def forms_for_user(user)
+/// - [ ] post "/publish"
+/// - [ ] def form_exists_for_user?(user, key)
+/// - [ ] get "/published"
+/// - [ ] get "/published/:id"
+/// - [ ] def authenticated_user
+/// - [ ] def forms_for_user(user)
 ///
-/// def seed_data_for_user(user)
-/// get "/seed/:user" (optional, designer expects forms to exist)
+/// - [ ] def seed_data_for_user(user)
+/// - [ ] get "/seed/:user" (optional, designer expects forms to exist)
 
 pub struct Api;
 
@@ -36,19 +36,18 @@ impl Api {
     }
 
     #[oai(path = "/published/:id", method = "get")]
-    async fn published(&self, data_pool: Data<&PgPool>, id: Path<i64>) -> PlainText<String> {
-        let forms: Vec<Form> = sqlx::query_as!(Form, "SELECT * FROM forms")
+    async fn published(&self, data_pool: Data<&PgPool>, id: Path<i64>) -> FormResponse {
+        let forms: Vec<Form> = sqlx::query_as!(Form, "SELECT * FROM forms WHERE id=$1;", id.0)
             .fetch_all(data_pool.0)
             .await
             .unwrap();
 
-        let username = forms
-            .first()
-            .expect("No forms in DB")
-            .username
-            .as_ref()
-            .unwrap();
-        PlainText(format!("Form id: {}!", username))
+        let a_form = forms.first();
+        match a_form {
+            Some(form) => FormResponse::Ok(Json(form.form.as_ref().unwrap().to_string())),
+            None => FormResponse::NotFound,
+        }
+
     }
 
     #[oai(path = "/seed/:user", method = "get")]
@@ -69,6 +68,16 @@ impl Api {
 
         PlainText(format!("forms created for user: {}", user.0))
     }
+}
+
+#[derive(poem_openapi::ApiResponse)]
+enum FormResponse {
+    /// Return the specified user.
+    #[oai(status = 200)]
+    Ok(Json<String>),
+    /// Return when the specified user is not found.
+    #[oai(status = 404)]
+    NotFound
 }
 
 async fn new_form(
