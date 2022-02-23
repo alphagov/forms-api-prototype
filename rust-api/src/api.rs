@@ -1,45 +1,49 @@
 use poem::web::Data;
-use poem_openapi::{
-    param::Path,
-    payload::{Json, PlainText},
-    Object, OpenApi,
-};
-use serde_json::{
-    Value,
-    json
-};
+use poem_openapi::{param::Path, payload::{Json, PlainText}, Object, OpenApi};
+use serde_json::{Value, json};
 use sqlx::{postgres::PgPool, Error};
-use std::{
-    fs,
-    path,
-};
+use std::{fs, path};
 use std::path::PathBuf;
 
 /// # API design
-/// - [ ] post "/publish"
-/// - [ ] def form_exists_for_user?(user, key)
+/// - [x] post "/publish"
+/// - [x] def form_exists_for_user?(user, key)
 /// - [ ] get "/published"
-/// - [ ] get "/published/:id"
+/// - [x] get "/published/:id"
 /// - [ ] def authenticated_user
 /// - [ ] def forms_for_user(user)
-///
-/// - [ ] def seed_data_for_user(user)
-/// - [ ] get "/seed/:user" (optional, designer expects forms to exist)
+/// - [x] def seed_data_for_user(user)
+/// - [x] get "/seed/:user" (optional, designer expects forms to exist)
 
 pub struct Api;
 
 #[OpenApi]
 impl Api {
     #[oai(path = "/publish", method = "post")]
-    async fn create_user(&self, request: Json<Request>) -> Json<String> {
-        /*
-        if form_exists_for_user("test user".to_string(), "test  key".to_string()) {
-            //update forms where user and id with config=request.configuration
+    async fn publish(&self, data_pool: Data<&PgPool>, request: Json<Request>) -> Json<String> {
+        let user = "test user".to_string();
+        let key = "test key".to_string();
+        if form_exists_for_user(&user, &key, data_pool.0).await {
+            sqlx::query!(
+                "UPDATE forms
+                 SET form = $1
+                 WHERE username = $2
+                 AND   key = $3;",
+                json!(request.configuration),
+                user,
+                key
+            ).fetch_one(data_pool.0)
+                .await.unwrap();
         } else {
-            //update forms where user and id with config=request.configuration and display_name=id
+            new_form(
+                &user,
+                &request.id,
+                &request.id,
+                json!(request.configuration),
+                data_pool.0,
+            ).await
+             .expect("new form insert failed");
         }
-        /
-        */
         Json(request.configuration.to_string())
     }
 
@@ -51,7 +55,7 @@ impl Api {
             .unwrap();
 
         let a_form = forms.first();
-        match a_form {
+        return match a_form {
             Some(form) => FormResponse::Ok(Json(form.form.as_ref().unwrap().to_string())),
             None => FormResponse::NotFound,
         }
@@ -60,30 +64,26 @@ impl Api {
 
     #[oai(path = "/seed/:user", method = "get")]
     async fn seed(&self, data_pool: Data<&PgPool>, user: Path<String>) -> PlainText<String> {
-        //let contents = fs::read_to_string(filename)
-        //    .expect("Something went wrong reading the file");
-        // For each json file in /example_forms, add to db, for current user
-        // insert into airport values (‘San Francisco’,’SFO’,ARRAY[23.42,-34.42, 23.34]);
-
-
         seed_data_for_user(&user.0, data_pool.0)
             .await
             .expect("Seeding data failed for user");
 
-        PlainText(format!("forms created for user: {}", user.0))
+        return PlainText(format!("forms created for user: {}", user.0))
     }
 }
 
 #[derive(poem_openapi::ApiResponse)]
 enum FormResponse {
-    /// Return the specified user.
+    /// Return the specified form.
     #[oai(status = 200)]
     Ok(Json<String>),
-    /// Return when the specified user is not found.
+    /// Return when the specified form is not found.
     #[oai(status = 404)]
     NotFound
 }
 
+/// For each json file in /example_forms, add to db, for current user
+/// insert into airport values (‘San Francisco’,’SFO’,ARRAY[23.42,-34.42, 23.34]);
 async fn seed_data_for_user(user: &str, pool: &PgPool) -> Result<(), Error> {
     let paths = fs::read_dir(&path::Path::new("./example_forms")).unwrap();
 
@@ -137,7 +137,7 @@ async fn new_form(
 
 #[derive(Object)]
 struct Request {
-    id: i64,
+    id: String,
     configuration: String,
 }
 
@@ -150,8 +150,15 @@ struct Form {
     form: Option<Value>,
 }
 
-/*
-fn form_exists_for_user(_user: String, _key: String) -> bool {
-    true
+
+async fn form_exists_for_user(user: &String, key: &String, pool: &PgPool) -> bool {
+
+    let forms: Vec<Form> = sqlx::query_as!(Form,
+        "SELECT * FROM forms WHERE username=$1 AND key=$2;",
+        user, key
+    ).fetch_all(pool)
+        .await
+        .unwrap();
+
+    forms.first().is_some()
 }
-*/
