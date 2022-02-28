@@ -29,7 +29,10 @@ async fn main() -> Result<()> {
 
     let pool = PgPool::connect("postgres://postgres:password@localhost/postgres").await?;
 
-    let api_service = OpenApiService::new(api::Api, "Forms API Rust Prototype", "0.0.1-alpha")
+    let api_service = OpenApiService::new(
+        api::Api, 
+        "Forms API Rust Prototype", 
+        env!("CARGO_PKG_VERSION"))
         .server("http://0.0.0.0:3000/api");
     let ui = api_service.swagger_ui();
 

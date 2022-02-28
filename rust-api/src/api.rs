@@ -8,20 +8,24 @@ use std::path::PathBuf;
 use crate::forms;
 use forms::Form;
 
-/// # API design
-/// - [x] post "/publish"
-/// - [x] def form_exists_for_user?(user, key)
-/// - [ ] get "/published"
-/// - [ ] def forms_for_user(user)
-/// - [x] get "/published/:id"
-/// - [ ] def authenticated_user
-/// - [x] def seed_data_for_user(user)
-/// - [x] get "/seed/:user" (optional, designer expects forms to exist)
+/**
+# API design
+- [x] post "/publish"
+- [x] def form_exists_for_user?(user, key)
+- [x] get "/published"
+- [x] def forms_for_user(user)
+- [x] get "/published/:id"
+- [ ] def authenticated_user
+- [x] def seed_data_for_user(user)
+- [x] get "/seed/:user" (optional, designer expects forms to exist)
+*/
 
 pub struct Api;
 
 #[OpenApi]
 impl Api {
+
+    /// Publish a form
     #[oai(path = "/publish", method = "post")]
     async fn publish(&self, data_pool: Data<&PgPool>, request: Json<Request>) -> Json<String> {
         let user = "test user".to_string();
@@ -50,6 +54,7 @@ impl Api {
         Json(request.configuration.to_string())
     }
 
+    /// Get form by its ID
     #[oai(path = "/published/:id", method = "get")]
     async fn published_by_id(&self, data_pool: Data<&PgPool>, id: Path<i64>) -> FormResponse {
         let forms: Vec<Form> = sqlx::query_as!(Form, "SELECT * FROM forms WHERE id=$1;", id.0)
@@ -65,6 +70,7 @@ impl Api {
 
     }
 
+    /// Create default forms for the user
     #[oai(path = "/seed/:user", method = "get")]
     async fn seed(&self, data_pool: Data<&PgPool>, user: Path<String>) -> PlainText<String> {
         seed_data_for_user(&user.0, data_pool.0)
@@ -74,6 +80,7 @@ impl Api {
         return PlainText(format!("forms created for user: {}", user.0))
     }
 
+    /// Get all forms for the user
     #[oai(path = "/published", method = "get")]
     async fn published(&self, data_pool: Data<&PgPool>) -> Json<Vec<PublishedForm>> {
         let user = "tris";
@@ -89,6 +96,18 @@ impl Api {
                 .collect();
         return Json(published_forms)
 }
+
+/*
+  def authenticated_user
+    token = request.env['HTTP_X_API_KEY']
+    begin
+      decoded_token = JWT.decode token, nil, false
+      return decoded_token[0]["user"]
+    rescue
+      return nil
+    end
+  end
+ */
 
 }
 #[derive(Object)]
