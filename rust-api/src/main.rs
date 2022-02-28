@@ -11,6 +11,7 @@ use sqlx::postgres::PgPool;
 use tracing_subscriber::EnvFilter;
 
 mod api;
+mod forms;
 
 fn setup() -> Result<(), Report> {
     dotenv().ok();

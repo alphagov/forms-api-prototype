@@ -1,17 +1,20 @@
 use poem::web::Data;
 use poem_openapi::{param::Path, payload::{Json, PlainText}, Object, OpenApi};
-use serde_json::{Value, json};
+use serde_json::{json};
 use sqlx::{postgres::PgPool, Error};
 use std::{fs, path};
 use std::path::PathBuf;
+
+use crate::forms;
+use forms::Form;
 
 /// # API design
 /// - [x] post "/publish"
 /// - [x] def form_exists_for_user?(user, key)
 /// - [ ] get "/published"
+/// - [ ] def forms_for_user(user)
 /// - [x] get "/published/:id"
 /// - [ ] def authenticated_user
-/// - [ ] def forms_for_user(user)
 /// - [x] def seed_data_for_user(user)
 /// - [x] get "/seed/:user" (optional, designer expects forms to exist)
 
@@ -23,7 +26,7 @@ impl Api {
     async fn publish(&self, data_pool: Data<&PgPool>, request: Json<Request>) -> Json<String> {
         let user = "test user".to_string();
         let key = "test key".to_string();
-        if form_exists_for_user(&user, &key, data_pool.0).await {
+        if Form::form_exists_for_user(&user, &key, data_pool.0).await {
             sqlx::query!(
                 "UPDATE forms
                  SET form = $1
@@ -35,7 +38,7 @@ impl Api {
             ).fetch_one(data_pool.0)
                 .await.unwrap();
         } else {
-            new_form(
+            Form::new_form(
                 &user,
                 &request.id,
                 &request.id,
@@ -48,7 +51,7 @@ impl Api {
     }
 
     #[oai(path = "/published/:id", method = "get")]
-    async fn published(&self, data_pool: Data<&PgPool>, id: Path<i64>) -> FormResponse {
+    async fn published_by_id(&self, data_pool: Data<&PgPool>, id: Path<i64>) -> FormResponse {
         let forms: Vec<Form> = sqlx::query_as!(Form, "SELECT * FROM forms WHERE id=$1;", id.0)
             .fetch_all(data_pool.0)
             .await
@@ -70,6 +73,29 @@ impl Api {
 
         return PlainText(format!("forms created for user: {}", user.0))
     }
+
+    #[oai(path = "/published", method = "get")]
+    async fn published(&self, data_pool: Data<&PgPool>) -> Json<Vec<PublishedForm>> {
+        let user = "tris";
+        let forms = Form::forms_for_user(user, data_pool.0).await;
+        let published_forms = forms
+            .iter()
+            .map(|form| {
+                PublishedForm {
+                    key: form.key.as_ref().unwrap().to_string(),
+                    display_name: form.display_name.as_ref().unwrap().to_string(),
+                    feedback_form: false
+                }})
+                .collect();
+        return Json(published_forms)
+}
+
+}
+#[derive(Object)]
+struct PublishedForm {
+    key: String,
+    display_name: String,
+    feedback_form: bool
 }
 
 #[derive(poem_openapi::ApiResponse)]
@@ -82,28 +108,33 @@ enum FormResponse {
     NotFound
 }
 
-/// For each json file in /example_forms, add to db, for current user
-/// insert into airport values (‘San Francisco’,’SFO’,ARRAY[23.42,-34.42, 23.34]);
-async fn seed_data_for_user(user: &str, pool: &PgPool) -> Result<(), Error> {
-    let paths = fs::read_dir(&path::Path::new("./example_forms")).unwrap();
 
-    let file_names = paths.filter_map(|entry| {
-        entry.ok().and_then(|e| {
-            let file_name = e.path()
+/// Returns a vec of the filenames inside `folder`
+async fn get_files_in_folder(folder: &str) -> Vec<String> {
+    let paths = fs::read_dir(&path::Path::new(folder)).unwrap();
+
+    paths.filter_map(|entry_result| {
+        entry_result.ok().and_then(|entry| {
+            entry
+                .path()
                 .file_name()
-                .and_then(|n| {
-                    n.to_str()
+                .and_then(|name| {
+                    name.to_str()
                     .map(String::from)
-                });
-            file_name
+                })
         })
-    }).collect::<Vec<String>>();
+    }).collect()
+}
 
+/// For each json file in /example_forms, add to db, for current user
+async fn seed_data_for_user(user: &str, pool: &PgPool) -> Result<(), Error> {
+
+    let file_names = get_files_in_folder("./example_forms").await; 
     for form_file in file_names {
         let path: PathBuf = ["./example_forms", &form_file].iter().collect();
         let file_content = fs::read_to_string(path).unwrap();
 
-        new_form(
+        Form::new_form(
             user,
             &form_file,
             &form_file,
@@ -114,26 +145,6 @@ async fn seed_data_for_user(user: &str, pool: &PgPool) -> Result<(), Error> {
     Ok(())
 }
 
-async fn new_form(
-    username: &str,
-    key: &str,
-    display_name: &str,
-    form: Value,
-    pool: &PgPool,
-) -> Result<Form, Error> {
-        sqlx::query_as!(
-            Form, 
-            "INSERT INTO forms
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING *;",
-            rand::random::<i64>(),
-            username,
-            key,
-            display_name,
-            form)
-            .fetch_one(pool)
-            .await
-}
 
 #[derive(Object)]
 struct Request {
@@ -141,24 +152,3 @@ struct Request {
     configuration: String,
 }
 
-#[derive(Debug, sqlx::Type)]
-struct Form {
-    id: i64,
-    username: Option<String>,
-    key: Option<String>,
-    display_name: Option<String>,
-    form: Option<Value>,
-}
-
-
-async fn form_exists_for_user(user: &String, key: &String, pool: &PgPool) -> bool {
-
-    let forms: Vec<Form> = sqlx::query_as!(Form,
-        "SELECT * FROM forms WHERE username=$1 AND key=$2;",
-        user, key
-    ).fetch_all(pool)
-        .await
-        .unwrap();
-
-    forms.first().is_some()
-}
