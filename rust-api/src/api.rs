@@ -1,9 +1,23 @@
-use poem::web::Data;
-use poem_openapi::{param::Path, payload::{Json, PlainText}, Object, OpenApi};
+use poem::{
+    Request,
+    web::Data
+};
+use poem_openapi::{
+    param::Path,
+    payload::{Json, PlainText},
+    Object,
+    OpenApi,
+    SecurityScheme,
+    auth::ApiKey,
+};
 use serde_json::{json};
 use sqlx::{postgres::PgPool, Error};
 use std::{fs, path};
 use std::path::PathBuf;
+use jwt::{SignWithKey, VerifyWithKey};
+use serde::{Deserialize, Serialize};
+use hmac::{Hmac};
+use sha2::Sha256;
 
 use crate::forms;
 use forms::Form;
@@ -20,6 +34,8 @@ use forms::Form;
 - [x] get "/seed/:user" (optional, designer expects forms to exist)
 */
 
+
+type ServerKey = Hmac<Sha256>;
 pub struct Api;
 
 #[OpenApi]
@@ -27,7 +43,7 @@ impl Api {
 
     /// Publish a form
     #[oai(path = "/publish", method = "post")]
-    async fn publish(&self, data_pool: Data<&PgPool>, request: Json<Request>) -> Json<String> {
+    async fn publish(&self, data_pool: Data<&PgPool>, request: Json<OurRequest>) -> Json<String> {
         let user = "test user".to_string();
         let key = "test key".to_string();
         if Form::form_exists_for_user(&user, &key, data_pool.0).await {
@@ -82,9 +98,9 @@ impl Api {
 
     /// Get all forms for the user
     #[oai(path = "/published", method = "get")]
-    async fn published(&self, data_pool: Data<&PgPool>) -> Json<Vec<PublishedForm>> {
-        let user = "tris";
-        let forms = Form::forms_for_user(user, data_pool.0).await;
+    async fn published(&self, auth: MyApiKeyAuthorization, data_pool: Data<&PgPool>) -> Json<Vec<PublishedForm>> {
+        let user = auth.0.username;
+        let forms = Form::forms_for_user(&user, data_pool.0).await;
         let published_forms = forms
             .iter()
             .map(|form| {
@@ -109,7 +125,34 @@ impl Api {
   end
  */
 
+
 }
+
+
+
+#[derive(Debug, Serialize, Deserialize)]
+struct User {
+    username: String,
+}
+
+/// ApiKey authorization
+#[derive(SecurityScheme)]
+#[oai(
+    type = "api_key",
+    key_name = "X-API-KEY",
+    in = "header",
+    checker = "api_checker"
+)]
+struct MyApiKeyAuthorization(User);
+
+
+
+async fn api_checker(req: &Request, api_key: ApiKey) -> Option<User> {
+    let server_key = req.data::<ServerKey>().unwrap();
+    VerifyWithKey::<User>::verify_with_key(api_key.key.as_str(), server_key).ok()
+}
+
+
 #[derive(Object)]
 struct PublishedForm {
     key: String,
@@ -166,7 +209,7 @@ async fn seed_data_for_user(user: &str, pool: &PgPool) -> Result<(), Error> {
 
 
 #[derive(Object)]
-struct Request {
+struct OurRequest {
     id: String,
     configuration: String,
 }
