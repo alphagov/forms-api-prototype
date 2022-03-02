@@ -14,26 +14,13 @@ use serde_json::{json};
 use sqlx::{postgres::PgPool, Error};
 use std::{fs, path};
 use std::path::PathBuf;
-use jwt::{SignWithKey, VerifyWithKey};
+use jwt::{VerifyWithKey};
 use serde::{Deserialize, Serialize};
 use hmac::{Hmac};
 use sha2::Sha256;
 
 use crate::forms;
 use forms::Form;
-
-/**
-# API design
-- [x] post "/publish"
-- [x] def form_exists_for_user?(user, key)
-- [x] get "/published"
-- [x] def forms_for_user(user)
-- [x] get "/published/:id"
-- [ ] def authenticated_user
-- [x] def seed_data_for_user(user)
-- [x] get "/seed/:user" (optional, designer expects forms to exist)
-*/
-
 
 type ServerKey = Hmac<Sha256>;
 pub struct Api;
@@ -80,7 +67,14 @@ impl Api {
 
         let a_form = forms.first();
         return match a_form {
-            Some(form) => FormResponse::Ok(Json(form.form.as_ref().unwrap().to_string())),
+            Some(form) => {
+                let published_form = PublishedForm {
+                    Key: form.key.as_ref().unwrap().to_string(),
+                    DisplayName: form.display_name.as_ref().unwrap().to_string(),
+                    FeedbackForm: false
+                };
+                FormResponse::Ok(Json(published_form))
+            }
             None => FormResponse::NotFound,
         }
 
@@ -98,16 +92,17 @@ impl Api {
 
     /// Get all forms for the user
     #[oai(path = "/published", method = "get")]
-    async fn published(&self, auth: MyApiKeyAuthorization, data_pool: Data<&PgPool>) -> Json<Vec<PublishedForm>> {
-        let user = auth.0.username;
+    async fn published(&self, data_pool: Data<&PgPool>) -> Json<Vec<PublishedForm>> {
+        //auth: MyApiKeyAuthorization,
+        let user = "jwt"; //auth.0.username;
         let forms = Form::forms_for_user(&user, data_pool.0).await;
         let published_forms = forms
             .iter()
             .map(|form| {
                 PublishedForm {
-                    key: form.key.as_ref().unwrap().to_string(),
-                    display_name: form.display_name.as_ref().unwrap().to_string(),
-                    feedback_form: false
+                    Key: form.key.as_ref().unwrap().to_string(),
+                    DisplayName: form.display_name.as_ref().unwrap().to_string(),
+                    FeedbackForm: false
                 }})
                 .collect();
         return Json(published_forms)
@@ -153,18 +148,20 @@ async fn api_checker(req: &Request, api_key: ApiKey) -> Option<User> {
 }
 
 
+/// Form objects. The x-gov builder expects pascal case
+#[allow(non_snake_case)]
 #[derive(Object)]
 struct PublishedForm {
-    key: String,
-    display_name: String,
-    feedback_form: bool
+    Key: String,
+    DisplayName: String,
+    FeedbackForm: bool
 }
 
 #[derive(poem_openapi::ApiResponse)]
 enum FormResponse {
     /// Return the specified form.
     #[oai(status = 200)]
-    Ok(Json<String>),
+    Ok(Json<PublishedForm>),
     /// Return when the specified form is not found.
     #[oai(status = 404)]
     NotFound

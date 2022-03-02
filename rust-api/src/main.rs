@@ -10,7 +10,6 @@ use poem_openapi::OpenApiService;
 use sqlx::postgres::PgPool;
 use tracing_subscriber::EnvFilter;
 use hmac::{Hmac, NewMac};
-use jwt::{SignWithKey, VerifyWithKey};
 use sha2::Sha256;
 mod api;
 mod forms;
@@ -38,14 +37,14 @@ async fn main() -> Result<()> {
         api::Api, 
         "Forms API Rust Prototype", 
         env!("CARGO_PKG_VERSION"))
-        .server("http://0.0.0.0:3000/api");
+        .server("http://0.0.0.0:4567/api");
     let ui = api_service.swagger_ui();
     let server_key = ServerKey::new_from_slice(SERVER_KEY).expect("valid server key");
-    Server::new(TcpListener::bind("0.0.0.0:3000"))
+    Server::new(TcpListener::bind("0.0.0.0:4567"))
         .run(
             Route::new()
-                .nest("/api", api_service)
-                .nest("/", ui)
+                .nest("/", api_service)
+                .nest("/ui", ui)
                 .data(pool)
                 .data(server_key)
                 .with(Cors::new()),
