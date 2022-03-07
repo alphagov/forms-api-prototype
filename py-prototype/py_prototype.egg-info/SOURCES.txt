@@ -1,0 +1,7 @@
+README.rst
+setup.py
+py_prototype/__init__.py
+py_prototype.egg-info/PKG-INFO
+py_prototype.egg-info/SOURCES.txt
+py_prototype.egg-info/dependency_links.txt
+py_prototype.egg-info/top_level.txt
