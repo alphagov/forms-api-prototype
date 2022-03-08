@@ -13,7 +13,7 @@ watch:
 lints:
 	clear
 	@poetry run black app.py
-	@poetry run flake8 app.py
+	@poetry run flake8 app.py --max-line-length 88 
 	@poetry run mypy app.py
 
 setup:

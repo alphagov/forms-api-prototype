@@ -11,6 +11,9 @@ flask-restful = "^0.3.9"
 flake8 = "^4.0.1"
 watchdog = "^2.1.6"
 PyYAML = "^6.0"
+SQLAlchemy = "^1.4.32"
+sqlalchemy-json = "^0.4.0"
+psycopg2 = "^2.9.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
