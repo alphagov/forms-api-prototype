@@ -84,27 +84,25 @@ def form_exists_for_user(user: str, form_id: str) -> bool:
 
     row = db.execute(
         forms.select().where(
-            sqlalchemy.and_(forms.c.username == user, forms.c.key == form_id)
+            sqlalchemy.and_(forms.c.username == user, forms.c.id == form_id)
         )
     ).fetchall()
 
     return len(row) > 0
 
 
-def update_form_for_user(user: str, form: str):
+def update_form_for_user(user: str, form: str, form_id: str):
     db.execute(
         forms.update()
-        .where(forms.c.username == user, forms.c.key == json.loads(form)["id"])
-        .values(form=form)
+        .where(forms.c.username == user, forms.c.key == form["key"])
+        .values(form=form, username=user, id=form_id)
     )
 
 
-# TODO
-def insert_form_for_user(user: str, form: str):
+def insert_form_for_user(user: str, form: str, form_id: str):
     db.execute(
-        forms.update()
-        .where(forms.c.username == user, forms.c.key == json.loads(form)["id"])
-        .values(form=form)
+        forms.insert()
+        .values(form=form, username=user, id=form_id)
     )
 
 
@@ -138,9 +136,9 @@ class Publish(Resource):
         form_id = request_body["id"]
         config = request_body["configuration"] if request_body["configuration"] else {}
         if form_exists_for_user(user, form_id):
-            update_form_for_user(user, config)
+            update_form_for_user(user, config, form_id)
         else:
-            insert_form_for_user(user, config)
+            insert_form_for_user(user, config, form_id)
         return config
 
 
